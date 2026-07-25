@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live 90s Qualifying</title>
+    <style>
+        :root {
+            --bg: #0b1220; --panel: #0f172a; --line: #1e293b; --line2: #24314a;
+            --fg: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+            --accent: #38bdf8; --gold: #fbbf24; --good: #22c55e; --warn: #eab308; --bad: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--fg);
+               font-family: 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif; padding: 14px; }
+        header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+        h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+        .sub { color: var(--muted); font-size: 13px; }
+        .badge { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line2); }
+        .badge.live { background: rgba(34,197,94,.15); color: var(--good); border-color: var(--good); }
+        .badge.idle { background: rgba(148,163,184,.12); color: var(--muted); }
+        .clock { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+
+        /* Content-width table: columns collapse to their content so Ch/Laps/
+           Remain/Avg/Best sit tightly next to each other instead of being
+           spread across the full viewport. */
+        table { width: auto; max-width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+        thead th { position: sticky; top: 0; background: var(--panel); color: var(--muted);
+                   font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+                   text-align: right; padding: 8px 7px; border-bottom: 2px solid var(--line2); white-space: nowrap; }
+        thead th.l { text-align: left; }
+        tbody td { padding: 7px 7px; text-align: right; white-space: nowrap; }
+        /* Pilot names get a little breathing room but never stretch the table. */
+        .pilotcol { min-width: 90px; }
+        tbody td.l { text-align: left; }
+        /* A pilot = main row + lap-times sub-row; only the sub-row carries the
+           separating border so the pair reads as one. The sub-row is always
+           present and reserves two chip-rows of height so a pilot's block does
+           not grow when the first lap times arrive. */
+        tbody tr.main td { border-bottom: none; }
+        tbody tr.laprow td { border-bottom: 1px solid var(--line2); padding: 0 10px 8px 44px; }
+        tbody tr.main:hover td, tbody tr.main:hover + tr.laprow td { background: rgba(56,189,248,.05); }
+        tr.notstarted td { color: var(--dim); }
+
+        .rank { font-weight: 700; font-size: 16px; width: 44px; }
+        .rank.p1 { color: var(--gold); } .rank.p2 { color: #cbd5e1; } .rank.p3 { color: #d19a66; }
+        .pilot { font-weight: 600; font-size: 15px; }
+        .chan { display: inline-block; min-width: 30px; text-align: center; font-size: 11px; font-weight: 700;
+                padding: 1px 6px; border-radius: 4px; color: #0b1220; }
+        .laps { font-size: 18px; font-weight: 800; color: var(--accent); }
+        .big  { font-size: 15px; font-weight: 600; }
+        .muted { color: var(--muted); }
+
+        .rem { font-size: 15px; font-weight: 700; }
+        .rem.g { color: var(--good); } .rem.y { color: var(--warn); } .rem.r { color: var(--bad); }
+        .rem.closed { color: var(--dim); font-weight: 600; }
+
+        /* vs-Target (pacemaker/ghost) delta */
+        .tgt { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .tgt.ahead { color: var(--good); }   /* faster than the ghost → minus */
+        .tgt.behind { color: var(--bad); }   /* slower than the ghost → plus */
+        .tgt.even { color: var(--muted); }
+        .tgt.none { color: var(--dim); font-weight: 600; }
+        #target-info { color: var(--gold); font-weight: 600; }
+
+        /* Browser-TTS unlock button (autoplay policy needs one user gesture).
+           Pinned top-left so the operator can enable audio at a glance. */
+        .tts-btn { align-self: center; font-size: 12px; padding: 4px 12px; border-radius: 999px;
+                   border: 1px solid var(--accent); background: rgba(56,189,248,.12); color: var(--accent);
+                   cursor: pointer; white-space: nowrap; }
+        .tts-btn:hover { background: rgba(56,189,248,.25); }
+        .tts-btn.on { border-color: var(--good); color: var(--good); background: rgba(34,197,94,.12); cursor: default; }
+        .tts-btn.hidden { display: none; }
+
+        /* min-height reserves two chip-rows (2×18px + 6px gap); align-content
+           keeps a single row pinned to the top of that reserved area. */
+        .laptimes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-start;
+                    align-content: flex-start; min-height: 42px; }
+        .lt { font-size: 12px; line-height: 16px; padding: 1px 6px; border-radius: 4px; background: var(--line);
+              color: var(--fg); font-variant-numeric: tabular-nums; }
+        .lt .ln { color: var(--dim); font-size: 10px; font-weight: 700; margin-right: 5px; letter-spacing: .3px; }
+        .lt.best { color: var(--good); }   /* best lap: green text only */
+        .empty { color: var(--dim); padding: 40px; text-align: center; font-size: 15px; }
+        .foot { color: var(--dim); font-size: 11px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <button id="tts-enable" class="tts-btn hidden">🔊 音声を有効化</button>
+        <h1>LIVE&nbsp;QUALIFYING&nbsp;<span class="muted">90s</span></h1>
+        <span id="racename" class="sub"></span>
+        <span id="state" class="badge idle">—</span>
+        <span class="sub">Race&nbsp;clock&nbsp;<span id="clock" class="clock">--.-</span>s</span>
+        <span id="target-info" class="sub"></span>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="l">#</th>
+                <th class="l pilotcol">Pilot</th>
+                <th class="l">Ch</th>
+                <th>LAPS</th>
+                <th>TIME</th>
+                <th id="th-target">vs<br>TARGET</th>
+                <th>残り時間</th>
+                <th>AVGLAP</th>
+                <th>BESTLAP</th>
+                <th>予想<br><span class="muted" style="font-weight:400">LAP / TIME</span></th>
+            </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">Waiting for race data…</div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const rowsEl = document.getElementById('rows');
+        const emptyEl = document.getElementById('empty');
+        const stateEl = document.getElementById('state');
+        const clockEl = document.getElementById('clock');
+        const raceNameEl = document.getElementById('racename');
+
+        let snap = null;
+        let perfBase = 0;      // performance.now() at snapshot receipt
+        let raceTimeBase = null;
+
+        // M:SS.mmm once the value reaches a minute; plain seconds below that.
+        function fmt(sec, dp) {
+            if (sec == null || !isFinite(sec)) return '—';
+            if (sec >= 60) {
+                const m = Math.floor(sec / 60);
+                const s = sec - m * 60;
+                const pad = dp > 0 ? dp + 3 : 2;   // "SS.mmm" width, zero-padded
+                return m + ':' + s.toFixed(dp).padStart(pad, '0');
+            }
+            return sec.toFixed(dp);
+        }
+
+        // Signed vs-Target delta: explicit + for slower (behind the ghost),
+        // - for faster (ahead). Returns the text + a state class for coloring.
+        function fmtDelta(d, dp) {
+            if (d == null) return { txt: '—', cls: 'none' };
+            const av = Math.abs(d).toFixed(dp);
+            if (d < 0) return { txt: '-' + av, cls: 'ahead' };
+            if (d > 0) return { txt: '+' + av, cls: 'behind' };
+            return { txt: '±' + av, cls: 'even' };
+        }
+
+        function liveRaceTime() {
+            if (!snap || !snap.raceActive || raceTimeBase == null) {
+                return snap ? snap.raceTime : null;
+            }
+            return raceTimeBase + (performance.now() - perfBase) / 1000;
+        }
+
+        function remainClass(rem, started, closed) {
+            if (!started) return 'closed';
+            if (closed || rem <= 0) return 'closed';
+            if (rem <= 10) return 'r';
+            if (rem <= 30) return 'y';
+            return 'g';
+        }
+
+        function render() {
+            if (!snap) return;
+            const dp = snap.decimalPlaces ?? 3;
+            const now = liveRaceTime();
+
+            raceNameEl.textContent = snap.raceName || '';
+            stateEl.textContent = snap.raceActive ? 'LIVE' : 'IDLE';
+            stateEl.className = 'badge ' + (snap.raceActive ? 'live' : 'idle');
+            clockEl.textContent = now == null ? '--.-' : now.toFixed(1);
+
+            // Pacemaker column is only shown when a target lap time is set.
+            const showTarget = snap.target > 0;
+            document.getElementById('th-target').style.display = showTarget ? '' : 'none';
+            document.getElementById('target-info').textContent =
+                showTarget ? `Target ${fmt(snap.target, dp)}s/lap` : '';
+
+            const pilots = snap.pilots || [];
+            emptyEl.style.display = pilots.length ? 'none' : 'block';
+
+            rowsEl.innerHTML = pilots.map(p => {
+                const started = p.started;
+                let remCell;
+                if (!started) {
+                    remCell = '<span class="rem closed">—</span>';
+                } else {
+                    const elapsed = (now != null ? now : (snap.raceTime ?? 0)) - p.windowOrigin;
+                    let rem = snap.window - elapsed;
+                    const closed = rem <= 0;
+                    if (rem < 0) rem = 0;
+                    const cls = remainClass(rem, started, closed);
+                    remCell = `<span class="rem ${cls}">${closed ? 'CLOSED' : rem.toFixed(1) + 's'}</span>`;
+                }
+
+                const color = p.color ? `rgb(${p.color.r},${p.color.g},${p.color.b})` : '#334155';
+                const rankCls = p.rank === 1 ? 'p1' : p.rank === 2 ? 'p2' : p.rank === 3 ? 'p3' : '';
+                const rankTxt = p.rank == null ? '–' : p.rank;
+
+                // lapTimes holds only recorded laps (holeshot excluded; sub-minimum
+                // and post-window laps are not recorded). lapTimes[0] = L01. Best
+                // lap is shown in green.
+                const chips = (p.lapTimes || []).map((t, i) => {
+                    const isBest = p.bestLap != null && Math.abs(t - p.bestLap) < 1e-6;
+                    const ln = 'L' + String(i + 1).padStart(2, '0');
+                    return `<span class="lt ${isBest ? 'best' : ''}"><span class="ln">${ln}</span>${fmt(t, dp)}</span>`;
+                }).join('');
+
+                let targetCell = '';
+                if (showTarget) {
+                    const d = fmtDelta(started ? p.targetDelta : null, dp);
+                    targetCell = `<td><span class="tgt ${d.cls}">${d.txt}</span></td>`;
+                }
+
+                const main = `
+                <tr class="main ${started ? '' : 'notstarted'}">
+                    <td class="l rank ${rankCls}">${rankTxt}</td>
+                    <td class="l pilot">${escapeHtml(p.pilotName)}</td>
+                    <td class="l"><span class="chan" style="background:${color}">${escapeHtml(p.band || '?')}</span></td>
+                    <td><span class="laps">${p.laps}</span></td>
+                    <td class="big">${fmt(p.time, dp)}</td>
+                    ${targetCell}
+                    <td>${remCell}</td>
+                    <td class="muted">${fmt(p.avgLap, dp)}</td>
+                    <td>${fmt(p.bestLap, dp)}</td>
+                    <td class="muted">${p.projLaps != null ? p.projLaps + ' / ' + fmt(p.projTime, dp) : '—'}</td>
+                </tr>`;
+                // Always render the sub-row (even empty) so the reserved height
+                // is present from the start and the block doesn't jump on lap 1.
+                const sub = `<tr class="laprow"><td colspan="${showTarget ? 10 : 9}"><div class="laptimes">${chips}</div></td></tr>`;
+                return main + sub;
+            }).join('');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function applySnapshot(data) {
+            snap = data;
+            perfBase = performance.now();
+            raceTimeBase = data.raceTime;
+            render();
+        }
+
+        // --- Browser TTS (Web Speech API) --------------------------------------
+        // When the server's TTS engine is "browser", it emits `browser_speak`
+        // with the announcement text + voice params; we speak it right here so
+        // no separate announcer page is needed. Autoplay policy requires one
+        // user gesture, so an unlock button is shown while supported.
+        const synth = window.speechSynthesis || null;
+        let ttsVoices = [];
+        let ttsUnlocked = false;
+        let ttsCur = { voiceName: '', lang: 'ja-JP', rate: 1.0, pitch: 1.0, volume: 1.0 };
+        const ttsBtn = document.getElementById('tts-enable');
+
+        // Gate-pass sound cue. Preloaded so playback is instant on each lap.
+        const detAudio = new Audio('/sound/detection.wav');
+        detAudio.preload = 'auto';
+        function playSound(file) {
+            // Clone so rapid consecutive detections can overlap instead of
+            // cutting each other off.
+            const src = (file === 'detection.wav' || !file) ? detAudio : new Audio('/sound/' + file);
+            const a = src.cloneNode ? src.cloneNode(true) : src;
+            a.play().catch(() => { /* blocked until audio is unlocked */ });
+        }
+
+        function ttsLoadVoices() { ttsVoices = synth ? synth.getVoices() : []; }
+
+        function ttsPickVoice() {
+            if (ttsCur.voiceName) {
+                const v = ttsVoices.find(v => v.name === ttsCur.voiceName);
+                if (v) return v;
+            }
+            const lc = (ttsCur.lang || '').toLowerCase();
+            return ttsVoices.find(v => (v.lang || '').toLowerCase() === lc)
+                || ttsVoices.find(v => (v.lang || '').toLowerCase().startsWith(lc.slice(0, 2)))
+                || null;
+        }
+
+        function ttsSpeak(text) {
+            if (!synth || !text) return;
+            const u = new SpeechSynthesisUtterance(text);
+            const v = ttsPickVoice();
+            if (v) u.voice = v;
+            u.lang = (v && v.lang) || ttsCur.lang || 'ja-JP';
+            u.rate = ttsCur.rate; u.pitch = ttsCur.pitch; u.volume = ttsCur.volume;
+            synth.speak(u);
+        }
+
+        function ttsUnlock() {
+            if (ttsUnlocked) return;
+            ttsUnlocked = true;
+            ttsBtn.classList.add('on');
+            ttsBtn.textContent = '✔ 音声ON';
+            if (synth) {
+                try { const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } catch (_e) { /* ignore */ }
+            }
+            // Prime the sound cue on the same gesture so later play() calls pass
+            // the autoplay policy.
+            try {
+                const v = detAudio.volume; detAudio.volume = 0;
+                detAudio.play().then(() => { detAudio.pause(); detAudio.currentTime = 0; detAudio.volume = v; })
+                                .catch(() => { detAudio.volume = v; });
+            } catch (_e) { /* ignore */ }
+        }
+
+        if (synth) {
+            ttsLoadVoices();
+            synth.onvoiceschanged = ttsLoadVoices;
+        }
+        // Reveal the unlock button regardless of TTS support — the gate-pass
+        // sound also needs one user gesture to satisfy the autoplay policy.
+        ttsBtn.classList.remove('hidden');
+        ttsBtn.onclick = ttsUnlock;
+
+        // Live push from the receiver on every lap / lifecycle change.
+        const socket = io();
+        socket.on('live_qualify', applySnapshot);
+
+        socket.on('browser_speak', (msg) => {
+            if (!msg || typeof msg.text !== 'string') return;
+            ttsCur = {
+                voiceName: msg.voiceName || '',
+                lang: msg.lang || 'ja-JP',
+                rate: typeof msg.rate === 'number' ? msg.rate : 1.0,
+                pitch: typeof msg.pitch === 'number' ? msg.pitch : 1.0,
+                volume: typeof msg.volume === 'number' ? msg.volume : 1.0,
+            };
+            // Attempt to speak even if not explicitly unlocked — some embeds
+            // (e.g. OBS) allow it. If the browser blocks it, the unlock button
+            // in the header lets the operator enable audio with one click.
+            ttsSpeak(msg.text);
+        });
+
+        socket.on('browser_speak_clear', () => { if (synth) synth.cancel(); });
+
+        // Gate-pass sound cue (e.g. detection.wav) on every lap-loop crossing.
+        socket.on('play_sound', (msg) => { playSound(msg && msg.file); });
+
+        // Initial paint + a periodic re-render so the remaining-second
+        // countdown and race clock tick smoothly between detections.
+        fetch('/api/live_qualify').then(r => r.json()).then(applySnapshot).catch(() => {});
+        setInterval(render, 200);
+    </script>
+</body>
+</html>

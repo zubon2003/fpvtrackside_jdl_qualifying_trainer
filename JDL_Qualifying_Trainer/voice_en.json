@@ -1,0 +1,15 @@
+{
+  "lap": "{pilot} lap{lap}、{time}seconds",
+  "lapNoTime": "{pilot}、lap{lap}",
+  "windowFinish": "{pilot}、finish. {laps} laps, total {min} minutes {sec} seconds",
+  "windowFinishSecOnly": "{pilot}、finish. {laps} laps, total {sec} seconds",
+  "windowFinishNoTime": "{pilot}、finish",
+  "countdown30": "{pilot}、{remaining} seconds left",
+  "countdown20": "{pilot}、{remaining} seconds left",
+  "countdown10": "{pilot}、{remaining} seconds left",
+  "staggeredStart": "{pilot}、start.",
+  "crash": "{pilot} crashed",
+  "raceEnd": "race finished",
+  "raceCancelled": "race canceled",
+  "raceFailed": "race failed."
+}

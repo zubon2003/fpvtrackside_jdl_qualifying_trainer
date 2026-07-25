@@ -1,0 +1,19 @@
+{
+  "lap": "{pilot}、ラップ{lap}、{time}秒",
+  "lapNoTime": "{pilot}、ラップ{lap}",
+  "windowFinish": "{pilot}、フィニッシュ!{laps}周、トータル{min}分{sec}秒",
+  "windowFinishSecOnly": "{pilot}、フィニッシュ!{laps}周、トータル{sec}秒",
+  "windowFinishNoTime": "{pilot}、フィニッシュ",
+  "countdown30": "{pilot}、残り{remaining}秒",
+  "countdown20": "{pilot}、残り{remaining}秒",
+  "countdown10": "{pilot}、残り{remaining}秒",
+  "staggeredStart": "{pilot}、スタート",
+  "raceStart": "レースを開始します。",
+  "targetAhead": "ターゲットより{delta}秒速い",
+  "targetBehind": "ターゲットより{delta}秒遅い",
+  "targetEven": "ターゲットどおり",
+  "crash": "{pilot}、クラッシュアウト",
+  "raceEnd": "レース終了",
+  "raceCancelled": "レース中止",
+  "raceFailed": "レース失敗"
+}

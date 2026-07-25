@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>JDL Qualifying Trainer — Control Panel</title>
+    <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/vendor/fontawesome/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #bb86fc;
+            --accent-hover: #9965f4;
+            --bg: #121212;
+            --surface: #1a1a1e;
+            --surface-2: #232329;
+            --border: #333840;
+            --text: #e6e6e9;
+            --text-muted: #9a9aa3;
+        }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; }
+
+        .navbar-brand small { color: var(--text-muted); font-weight: normal; }
+
+        .card { background-color: var(--surface); border: 1px solid var(--border); color: var(--text);
+                border-radius: 14px; margin-bottom: 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.28); }
+        .card-header { background-color: var(--surface-2); border-bottom: 1px solid var(--border);
+                       color: var(--accent); font-weight: 600; border-radius: 14px 14px 0 0 !important;
+                       display: flex; align-items: center; gap: .5rem; }
+        .card-header i.fa-fw { color: var(--accent); opacity: .9; }
+        .card-body { padding: 1.1rem 1.25rem; }
+
+        .btn-primary { background-color: var(--accent); border: none; color: #1a1a1e; font-weight: bold; }
+        .btn-primary:hover { background-color: var(--accent-hover); color: #1a1a1e; }
+        .btn-outline-primary { color: var(--accent); border-color: var(--accent); }
+        .btn-outline-primary:hover, .btn-check:checked + .btn-outline-primary { background-color: var(--accent); color: #1a1a1e; }
+
+        .form-control, .form-select { background-color: #2a2a30; border: 1px solid var(--border); color: var(--text); border-radius: 8px; }
+        .form-control:focus, .form-select:focus { background-color: #30303a; color: #fff; border-color: var(--accent);
+                                                    box-shadow: 0 0 0 .2rem rgba(187,134,252,.2); }
+        .form-control::placeholder { color: #6f6f78; }
+        /* Bootstrap's .text-muted resolves to its light-theme gray (dark,
+           meant for light backgrounds) since this page never sets
+           data-bs-theme="dark" — override it so muted text stays readable
+           on our dark surfaces. */
+        .text-muted { color: var(--text-muted) !important; }
+        .form-check-input { background-color: #2a2a30; border-color: #55555f; }
+        .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+        .form-check-input:focus { box-shadow: 0 0 0 .2rem rgba(187,134,252,.2); }
+
+        .nav-tabs { border-bottom: 1px solid var(--border); }
+        .nav-tabs .nav-link { color: var(--text-muted); border: none; border-radius: 0; padding: .6rem 1.1rem; }
+        .nav-tabs .nav-link i { margin-right: .4rem; }
+        .nav-tabs .nav-link.active { background-color: transparent; color: var(--accent); border: none; border-bottom: 3px solid var(--accent); }
+        .nav-tabs .nav-link:hover { border: none; color: #fff; }
+
+        /* Compact chip-style toggles for the voice on/off group — checkboxes
+           styled as pills via Bootstrap's btn-check so many switches fit
+           without the vertical weight of one row per switch. */
+        .chip-toggle { display: none; }
+        .chip-toggle + label {
+            display: inline-flex; align-items: center; gap: .4rem;
+            padding: .4rem .85rem; border-radius: 999px; font-size: .85rem;
+            background-color: #2a2a30; border: 1px solid var(--border); color: var(--text-muted);
+            cursor: pointer; transition: all .15s ease;
+        }
+        .chip-toggle + label:hover { border-color: var(--accent); color: var(--text); }
+        .chip-toggle:checked + label { background-color: rgba(187,134,252,.16); border-color: var(--accent); color: var(--accent); }
+        .chip-toggle:checked + label i { color: var(--accent); }
+        .chip-toggle:focus-visible + label { box-shadow: 0 0 0 .2rem rgba(187,134,252,.3); }
+
+        .pilot-name-toggle { background-color: var(--surface-2); border: 1px solid var(--border);
+                              border-radius: 10px; padding: .75rem 1rem; }
+
+        /* Save feedback as a bottom-right toast instead of inline fading text —
+           :not(:empty) drives the fade so no extra JS is needed. */
+        #status-msg {
+            position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 1080;
+            background-color: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 10px; padding: .5rem 1rem; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+            opacity: 0; transform: translateY(6px); transition: opacity .2s ease, transform .2s ease;
+            pointer-events: none;
+        }
+        #status-msg:not(:empty) { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-black mb-4">
+    <div class="container flex-wrap">
+        <span class="navbar-brand mb-0 h1 d-flex flex-column lh-sm">
+            <span><i class="fas fa-microchip me-2"></i>JDL Qualifying Trainer</span>
+            <small class="fs-6"><i class="fas fa-check-circle me-1"></i>変更は自動保存されます</small>
+        </span>
+        <div class="d-flex gap-2">
+            <a href="/html/livequalify" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-stopwatch me-1"></i>Live 90s</a>
+            <a href="/html/leaderboard" target="_blank" class="btn btn-sm btn-outline-info"><i class="fas fa-trophy me-1"></i>Leaderboard</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-system"><i class="fas fa-sliders"></i>System</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-voice"><i class="fas fa-microphone-lines"></i>Voice</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- System tab -->
+        <div class="tab-pane fade show active" id="tab-system">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-server fa-fw"></i>System Configuration</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Server Port</label>
+                            <input type="number" id="sys_port" class="form-control" placeholder="8765">
+                            <div class="mt-2 small text-warning">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                Port change requires a manual server restart to take effect.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><i class="fas fa-arrow-down-wide-short fa-fw"></i>Live 90s 表示順序</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="lq_sort" id="lq_freq" value="frequency">
+                            <label class="btn btn-outline-primary w-100" for="lq_freq">周波数</label>
+                        </div>
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="lq_sort" id="lq_rank" value="rank">
+                            <label class="btn btn-outline-primary w-100" for="lq_rank">順位</label>
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        周波数: 周波数の低い順で固定（並びは変わりません）。<br>
+                        順位: ラップ数 → タイムで並べ替え（レース進行に応じて動く）。
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><i class="fas fa-bullseye fa-fw"></i>Live 90s Target（ペースメーカー）</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">目標ラップタイム（秒）</label>
+                            <input type="number" step="0.1" min="0" id="lq_target" class="form-control" placeholder="0">
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="lq_speak_delta">
+                                <label class="form-check-label small" for="lq_speak_delta">差を読み上げる（ラップタイムの後に）</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        0: Target無し（表示しません）。<br>
+                        秒数を入れると、その秒数で1周するペースメーカー（ゴースト）をリアルタイム画面に表示し、
+                        各パイロットとの差（累積）を出します。<strong>Targetより速ければマイナス、遅ければプラス</strong>。
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-table fa-fw"></i>Google Sheets 書き出し（Time Trial 結果）</span>
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="gs_enabled">
+                        <label class="form-check-label small" for="gs_enabled">自動書き出し</label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Spreadsheet ID</label>
+                            <input type="text" id="gs_spreadsheet" class="form-control" placeholder="1AbC...（スプレッドシートURLの /d/ と /edit の間）">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">シート名（タブ）</label>
+                            <input type="text" id="gs_sheet" class="form-control" placeholder="TimeTrial">
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex align-items-center gap-3">
+                        <button id="btn-sheets-write" type="button" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-file-export me-1"></i>今すぐ書き出し
+                        </button>
+                        <span id="gs_status" class="small"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice tab -->
+        <div class="tab-pane fade" id="tab-voice">
+            <div class="card mb-3">
+                <div class="card-header"><i class="fas fa-microphone fa-fw"></i>TTS Engine</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="tts_engine" id="tts_voicevox" value="voicevox">
+                            <label class="btn btn-outline-primary w-100" for="tts_voicevox">VOICEVOX</label>
+                        </div>
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="tts_engine" id="tts_browser" value="browser">
+                            <label class="btn btn-outline-primary w-100" for="tts_browser">Browser TTS</label>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2 align-items-end">
+                        <div class="col-12">
+                            <label class="form-label mb-1">Voice file <button type="button" id="voice_file_refresh" class="btn btn-link btn-sm p-0 ms-1" title="Rescan voice*.json files"><i class="fas fa-sync-alt"></i></button></label>
+                            <select id="voice_file" class="form-select"></select>
+                            <div class="small text-muted mt-1">Lists <code>voice*.json</code> files in the receiver folder. Selected file supplies the phrase templates used by both engines.</div>
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2">Race announcements + Test Voice route through the selected engine.</div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="card-voicevox">
+                <div class="card-header"><i class="fas fa-robot fa-fw"></i>VOICEVOX</div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">URL</label>
+                            <input type="text" id="vv_url" class="form-control" placeholder="http://localhost:50021">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Speaker</label>
+                            <select id="vv_speaker" class="form-select"></select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Volume</label>
+                            <input type="number" step="0.1" id="vv_volume" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-3">
+                            <label class="form-label">Speed</label>
+                            <input type="number" step="0.1" id="vv_speed" class="form-control">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Audio delay (ms)</label>
+                            <input type="number" id="vv_delay" class="form-control">
+                        </div>
+                        <div class="col-3 form-check form-switch align-self-end">
+                            <input class="form-check-input" type="checkbox" id="vv_enabled">
+                            <label class="form-check-label">Enabled</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="card-browser">
+                <div class="card-header"><i class="fas fa-globe fa-fw"></i>Browser TTS（Web Speech API）</div>
+                <div class="card-body">
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="fas fa-headphones me-1"></i>
+                        読み上げは <a href="/html/livequalify" target="_blank" class="alert-link">Live 90s ページ</a> で再生されます。
+                        本番前にそのページを開き、ヘッダーの「🔊 音声を有効化」を1回クリックしてください（自動再生ブロック対策）。
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-8">
+                            <label class="form-label">Voice <button type="button" id="b_voice_refresh" class="btn btn-link btn-sm p-0 ms-1" title="音声リストを再取得"><i class="fas fa-sync-alt"></i></button></label>
+                            <select id="b_voice" class="form-select"></select>
+                            <div class="small text-muted mt-1">このブラウザで利用可能な音声を表示します（読み上げるLive 90sページも同じブラウザ／PCで開いてください）。</div>
+                        </div>
+                        <div class="col-4 form-check form-switch align-self-start mt-4 ps-5">
+                            <input class="form-check-input" type="checkbox" id="b_enabled">
+                            <label class="form-check-label">Enabled</label>
+                        </div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4">
+                            <label class="form-label">Rate（速度）</label>
+                            <input type="number" step="0.05" min="0.1" max="10" id="b_rate" class="form-control">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Pitch（高さ）</label>
+                            <input type="number" step="0.1" min="0" max="2" id="b_pitch" class="form-control">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Volume（音量）</label>
+                            <input type="number" step="0.05" min="0" max="1" id="b_volume" class="form-control">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><i class="fas fa-toggle-on fa-fw"></i>読み上げ ON/OFF</div>
+                <div class="card-body">
+                    <div class="pilot-name-toggle mb-3">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="tts_speak_pilot">
+                            <label class="form-check-label" for="tts_speak_pilot">パイロット名を読み上げる</label>
+                        </div>
+                        <div class="small text-muted mt-1">OFFにすると、周回スタート合図を除く全ての読み上げでパイロット名を省略します(匿名モード)。</div>
+                    </div>
+
+                    <div class="small text-muted mb-2">レース進行</div>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_lap" data-key="lap" autocomplete="off">
+                        <label for="ve_lap"><i class="fas fa-flag"></i>ラップ通過</label>
+
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_countdown30" data-key="countdown30" autocomplete="off">
+                        <label for="ve_countdown30"><i class="fas fa-hourglass-start"></i>残り30秒</label>
+
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_countdown20" data-key="countdown20" autocomplete="off">
+                        <label for="ve_countdown20"><i class="fas fa-hourglass-half"></i>残り20秒</label>
+
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_countdown10" data-key="countdown10" autocomplete="off">
+                        <label for="ve_countdown10"><i class="fas fa-hourglass-end"></i>残り10秒</label>
+
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_windowFinish" data-key="windowFinish" autocomplete="off">
+                        <label for="ve_windowFinish"><i class="fas fa-flag-checkered"></i>90秒フィニッシュ</label>
+                    </div>
+
+                    <div class="small text-muted mb-2">スタート合図</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_staggeredStart" data-key="staggeredStart" autocomplete="off">
+                        <label for="ve_staggeredStart"><i class="fas fa-bolt"></i>周回スタート合図</label>
+
+                        <input class="chip-toggle voice-enabled-toggle" type="checkbox" id="ve_raceStart" data-key="raceStart" autocomplete="off">
+                        <label for="ve_raceStart"><i class="fas fa-play"></i>レース開始</label>
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        OFFにした種類は、voice*.jsonのフレーズ設定に関わらず読み上げられません。ターゲット差の読み上げは上の「Live 90s Target」カードで設定します。<br>
+                        クラッシュアウト・レース終了・レース中止・レース失敗は常時ON(スイッチ無し・OFFにできません)。
+                    </div>
+                </div>
+            </div>
+
+            <button id="btn-test-voice" class="btn btn-outline-info">
+                <i class="fas fa-volume-up me-2"></i>Test Voice
+            </button>
+            <span class="small text-muted ms-2">Browser TTS選択時はLive 90sページで再生されます。</span>
+        </div>
+    </div>
+
+</div>
+
+<div id="status-msg"></div>
+
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+let cfg = {};
+
+async function fetchSpeakers() {
+    const url = document.getElementById('vv_url').value || 'http://localhost:50021';
+    const select = document.getElementById('vv_speaker');
+    const currentVal = select.value;
+
+    try {
+        // Go through the receiver to avoid CORS — VOICEVOX engine doesn't send
+        // Access-Control-Allow-Origin unless started with --cors_policy_mode all.
+        const res = await fetch(`/api/voicevox/speakers?url=${encodeURIComponent(url)}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        const speakers = await res.json();
+
+        select.innerHTML = '';
+        speakers.forEach(s => {
+            s.styles.forEach(style => {
+                const opt = document.createElement('option');
+                opt.value = style.id;
+                opt.textContent = `${s.name} (${style.name})`;
+                select.appendChild(opt);
+            });
+        });
+
+        // Restore previous selection if still exists
+        if (currentVal) select.value = currentVal;
+    } catch (e) {
+        select.innerHTML = '<option value="">(Error fetching speakers)</option>';
+        console.error('VOICEVOX fetch error:', e);
+    }
+}
+
+async function fetchVoiceFiles(preferred) {
+    const select = document.getElementById('voice_file');
+    try {
+        const res = await fetch('/api/voice_files');
+        const data = await res.json();
+        const files = Array.isArray(data.files) ? data.files : [];
+        const current = data.current || 'voice.json';
+        select.innerHTML = '';
+        if (files.length === 0) {
+            // Defensive: voice.json should exist after first boot, but if the
+            // scan returned nothing we still show the active one so the UI
+            // doesn't look broken.
+            const opt = document.createElement('option');
+            opt.value = current;
+            opt.textContent = current;
+            select.appendChild(opt);
+        } else {
+            files.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+        }
+        const desired = preferred || current;
+        if ([...select.options].some(o => o.value === desired)) {
+            select.value = desired;
+        }
+    } catch (e) {
+        select.innerHTML = `<option value="">(${e.message})</option>`;
+        console.error('voice files fetch error:', e);
+    }
+}
+
+// Browser TTS voices are enumerated locally via the Web Speech API. The list
+// can arrive asynchronously, so we also refresh on the 'voiceschanged' event.
+// Japanese voices are floated to the top since this is a JP event.
+function populateBrowserVoices(preferred) {
+    const select = document.getElementById('b_voice');
+    const desired = preferred != null ? preferred : (select.dataset.desiredValue ?? select.value ?? '');
+    const synth = window.speechSynthesis;
+    const voices = synth ? synth.getVoices() : [];
+
+    select.innerHTML = '';
+    // First option = "page default" (empty voiceName → announcer picks by lang).
+    const def = document.createElement('option');
+    def.value = '';
+    def.textContent = '（既定 / ブラウザにおまかせ）';
+    select.appendChild(def);
+
+    if (!synth) {
+        select.dataset.desiredValue = desired;
+        return;
+    }
+    const sorted = voices.slice().sort((a, b) => {
+        const ja = (a.lang || '').toLowerCase().startsWith('ja') ? 0 : 1;
+        const jb = (b.lang || '').toLowerCase().startsWith('ja') ? 0 : 1;
+        return (ja - jb) || a.name.localeCompare(b.name);
+    });
+    sorted.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = `${v.name} (${v.lang})`;
+        select.appendChild(opt);
+    });
+
+    if ([...select.options].some(o => o.value === desired)) {
+        select.value = desired;
+        delete select.dataset.desiredValue;
+    } else {
+        // Voice not present yet (list still loading) — remember it so a later
+        // voiceschanged pass can restore the saved selection.
+        select.dataset.desiredValue = desired;
+    }
+}
+
+function applyEngineVisibility(engine) {
+    const isBrowser = engine === 'browser';
+    // Hide the inactive engine's card outright (rather than dimming it) so the
+    // panel only shows settings that actually apply right now.
+    document.getElementById('card-voicevox').classList.toggle('d-none', isBrowser);
+    document.getElementById('card-browser').classList.toggle('d-none', !isBrowser);
+}
+
+async function loadConfig() {
+    cfg = await (await fetch('/api/config')).json();
+    const vv  = cfg.voicevox || {};
+    const b   = cfg.browser_tts || {};
+    const tts = cfg.tts || {};
+    const ext = cfg.extension || {};
+
+    document.getElementById('tts_speak_pilot').checked = tts.speakPilotName !== false;
+
+    const engine = tts.engine === 'browser' ? 'browser' : 'voicevox';
+    const engineEl = document.querySelector(`input[name="tts_engine"][value="${engine}"]`);
+    if (engineEl) engineEl.checked = true;
+    applyEngineVisibility(engine);
+
+    await fetchVoiceFiles(tts.voiceFile);
+
+    document.getElementById('vv_url').value = vv.url || 'http://localhost:50021';
+
+    // Fetch speakers first then set the value
+    await fetchSpeakers();
+    document.getElementById('vv_speaker').value = vv.speaker ?? 3;
+
+    document.getElementById('vv_volume').value = vv.volume ?? 1;
+    document.getElementById('vv_speed').value = vv.speed ?? 1.2;
+    document.getElementById('vv_delay').value = vv.audio_delay_ms ?? 0;
+    document.getElementById('vv_enabled').checked = !!vv.enabled;
+
+    document.getElementById('b_rate').value = b.rate ?? 1.0;
+    document.getElementById('b_pitch').value = b.pitch ?? 1.0;
+    document.getElementById('b_volume').value = b.volume ?? 1.0;
+    document.getElementById('b_enabled').checked = !!b.enabled;
+    // Populate from the local Web Speech API. The list may still be loading, so
+    // remember the saved voice and let the voiceschanged handler restore it.
+    populateBrowserVoices(b.voiceName || '');
+
+    document.getElementById('sys_port').value = ext.port ?? 8765;
+
+    const lq = cfg.live_qualify || {};
+    const lqMode = lq.sortMode === 'frequency' ? 'frequency' : 'rank';
+    const lqEl = document.querySelector(`input[name="lq_sort"][value="${lqMode}"]`);
+    if (lqEl) lqEl.checked = true;
+    document.getElementById('lq_target').value = lq.targetLapTime ?? 0;
+    document.getElementById('lq_speak_delta').checked = lq.speakTargetDelta !== false;
+
+    const gs = cfg.google_sheets || {};
+    document.getElementById('gs_enabled').checked = !!gs.enabled;
+    document.getElementById('gs_spreadsheet').value = gs.spreadsheetId || '';
+    document.getElementById('gs_sheet').value = gs.sheetName || 'TimeTrial';
+
+    const ve = cfg.voice_enabled || {};
+    document.querySelectorAll('.voice-enabled-toggle').forEach(el => {
+        el.checked = ve[el.dataset.key] !== false;
+    });
+}
+
+async function saveConfig() {
+    cfg.extension = cfg.extension || {};
+    cfg.extension.port = parseInt(document.getElementById('sys_port').value);
+
+    cfg.live_qualify = cfg.live_qualify || {};
+    const lqSel = document.querySelector('input[name="lq_sort"]:checked');
+    cfg.live_qualify.sortMode = lqSel ? lqSel.value : 'rank';
+    const lqTarget = parseFloat(document.getElementById('lq_target').value);
+    cfg.live_qualify.targetLapTime = (Number.isFinite(lqTarget) && lqTarget > 0) ? lqTarget : 0;
+    cfg.live_qualify.speakTargetDelta = document.getElementById('lq_speak_delta').checked;
+
+    cfg.google_sheets = cfg.google_sheets || {};
+    cfg.google_sheets.enabled = document.getElementById('gs_enabled').checked;
+    cfg.google_sheets.spreadsheetId = document.getElementById('gs_spreadsheet').value.trim();
+    cfg.google_sheets.sheetName = document.getElementById('gs_sheet').value.trim() || 'TimeTrial';
+
+    cfg.voicevox = cfg.voicevox || {};
+    cfg.voicevox.url = document.getElementById('vv_url').value;
+    cfg.voicevox.speaker = parseInt(document.getElementById('vv_speaker').value);
+    cfg.voicevox.volume = parseFloat(document.getElementById('vv_volume').value);
+    cfg.voicevox.speed = parseFloat(document.getElementById('vv_speed').value);
+    cfg.voicevox.audio_delay_ms = parseInt(document.getElementById('vv_delay').value);
+    cfg.voicevox.enabled = document.getElementById('vv_enabled').checked;
+
+    delete cfg.google_tts;   // legacy key removed when saving
+    cfg.browser_tts = cfg.browser_tts || {};
+    const bVoiceName = document.getElementById('b_voice').value || '';
+    cfg.browser_tts.voiceName = bVoiceName;
+    // Derive lang from the chosen voice so the announcer page matches even when
+    // its own default differs; fall back to JP when using the page default.
+    const bVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    const bv = bVoices.find(v => v.name === bVoiceName);
+    cfg.browser_tts.lang = bv ? bv.lang : (cfg.browser_tts.lang || 'ja-JP');
+    const bRate = parseFloat(document.getElementById('b_rate').value);
+    const bPitch = parseFloat(document.getElementById('b_pitch').value);
+    const bVol = parseFloat(document.getElementById('b_volume').value);
+    cfg.browser_tts.rate = Number.isFinite(bRate) ? bRate : 1.0;
+    cfg.browser_tts.pitch = Number.isFinite(bPitch) ? bPitch : 1.0;
+    cfg.browser_tts.volume = Number.isFinite(bVol) ? bVol : 1.0;
+    cfg.browser_tts.enabled = document.getElementById('b_enabled').checked;
+
+    cfg.tts = cfg.tts || {};
+    const engineEl = document.querySelector('input[name="tts_engine"]:checked');
+    cfg.tts.engine = engineEl ? engineEl.value : 'voicevox';
+    cfg.tts.voiceFile = document.getElementById('voice_file').value || 'voice.json';
+    cfg.tts.speakPilotName = document.getElementById('tts_speak_pilot').checked;
+    applyEngineVisibility(cfg.tts.engine);
+
+    cfg.voice_enabled = cfg.voice_enabled || {};
+    document.querySelectorAll('.voice-enabled-toggle').forEach(el => {
+        cfg.voice_enabled[el.dataset.key] = el.checked;
+    });
+
+    const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg)
+    });
+    const msg = document.getElementById('status-msg');
+    if (res.ok) {
+        msg.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Saved</span>';
+    } else {
+        msg.innerHTML = '<span class="text-danger">Save failed</span>';
+    }
+    setTimeout(() => msg.innerHTML = '', 3000);
+}
+
+// Auto-save everything when changed
+document.querySelectorAll('input, select').forEach(el => {
+    el.onchange = async () => {
+        if (el.id === 'vv_url') await fetchSpeakers();
+        await saveConfig();
+    };
+});
+
+document.getElementById('voice_file_refresh').onclick = async (e) => {
+    e.preventDefault();
+    await fetchVoiceFiles(document.getElementById('voice_file').value);
+};
+
+document.getElementById('b_voice_refresh').onclick = (e) => {
+    e.preventDefault();
+    const v = document.getElementById('b_voice');
+    populateBrowserVoices(v.value);
+};
+
+// The browser voice list often arrives after first paint — restore the saved
+// selection when it does.
+if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => populateBrowserVoices();
+}
+
+// Browser TTS: speak the test line directly in THIS page. The click is a user
+// gesture, so speechSynthesis plays without the autoplay-unlock step — and the
+// operator hears it right here instead of only on the Live 90s overlay.
+function speakBrowserTestLocal(text) {
+    const synth = window.speechSynthesis;
+    if (!synth) { alert('このブラウザは Web Speech API（Browser TTS）に対応していません。'); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const voiceName = document.getElementById('b_voice').value || '';
+    const v = synth.getVoices().find(x => x.name === voiceName);
+    if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'ja-JP'; }
+    const rate = parseFloat(document.getElementById('b_rate').value);
+    const pitch = parseFloat(document.getElementById('b_pitch').value);
+    const vol = parseFloat(document.getElementById('b_volume').value);
+    u.rate = Number.isFinite(rate) ? rate : 1.0;
+    u.pitch = Number.isFinite(pitch) ? pitch : 1.0;
+    u.volume = Number.isFinite(vol) ? vol : 1.0;
+    synth.speak(u);
+}
+
+document.getElementById('btn-test-voice').onclick = async () => {
+    const btn = document.getElementById('btn-test-voice');
+    const engineEl = document.querySelector('input[name="tts_engine"]:checked');
+    const engine = engineEl ? engineEl.value : 'voicevox';
+    btn.disabled = true;
+    try {
+        if (engine === 'browser') {
+            // Persist current settings first, then speak locally in this page.
+            await saveConfig();
+            speakBrowserTestLocal('接続テストです。この声で読み上げを行います。');
+        } else {
+            // VOICEVOX: server-side OS playback at the receiver machine.
+            await fetch('/api/test_voice');
+        }
+    } finally { btn.disabled = false; }
+};
+
+document.getElementById('btn-sheets-write').onclick = async () => {
+    const btn = document.getElementById('btn-sheets-write');
+    const status = document.getElementById('gs_status');
+    btn.disabled = true;
+    status.innerHTML = '<span class="text-muted">書き出し中…</span>';
+    try {
+        await saveConfig();  // persist the current ID/sheet name first
+        const res = await fetch('/api/sheets/write', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            status.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>${data.rows} 行を「${data.sheetName}」に書き出しました</span>`;
+        } else {
+            status.innerHTML = `<span class="text-danger">失敗: ${data.error || res.status}</span>`;
+        }
+    } catch (e) {
+        status.innerHTML = `<span class="text-danger">失敗: ${e.message}</span>`;
+    } finally {
+        btn.disabled = false;
+    }
+};
+
+(async () => {
+    await loadConfig();
+})();
+</script>
+</body>
+</html>
