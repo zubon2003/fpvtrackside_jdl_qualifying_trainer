@@ -229,6 +229,7 @@ const router = createRouter({
     ttsHandler: () => ttsHandler,
     voiceLogic, voiceTemplates, resultsStore, liveQualify,
     configStore, logger,
+    startStageWatch: () => startStageWatch(),
 });
 
 // Drives the per-pilot 30s/20s/10s-remaining voice countdown. Runs
@@ -440,6 +441,18 @@ function scheduleSheetsWrite() {
     }, 10_000);
 }
 
+// Starts (or restarts) the events-directory watcher. Called once at boot and
+// again from the Hello handler: on a fresh install boot happens before
+// FPVTrackside's first Hello, so paths.eventsDirectory isn't known yet and the
+// boot-time attempt is a no-op (logs a warning). Hello is what actually
+// populates it, so it must retry the watch itself or it never starts.
+function startStageWatch() {
+    return stageStandings.startWatching(() => {
+        io.emit('leaderboard_update', leaderboardPayload());
+        scheduleSheetsWrite();
+    });
+}
+
 // Manual "write now" (config-page test button) — bypasses the debounce.
 app.post('/api/sheets/write', async (_req, res) => {
     const gs = config.google_sheets || {};
@@ -551,11 +564,10 @@ server.listen(PORT, HOST, () => {
     console.log('────────────────────────────────────────────────────────────');
 
     // Watch FPVTrackside's event files; on every lap-time write, recompute the
-    // stage standings and push them to the leaderboard overlays.
-    stageStandings.startWatching(() => {
-        io.emit('leaderboard_update', leaderboardPayload());
-        scheduleSheetsWrite();
-    });
+    // stage standings and push them to the leaderboard overlays. On a fresh
+    // install this is a no-op until Hello arrives and populates
+    // paths.eventsDirectory (see startStageWatch's other call site).
+    startStageWatch();
 });
 
 let shuttingDown = false;

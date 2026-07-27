@@ -16,7 +16,7 @@ function createRouter(services) {
     const {
         io, ttsHandler: ttsHandlerRef,
         voiceLogic, voiceTemplates, resultsStore, liveQualify,
-        configStore, logger,
+        configStore, logger, startStageWatch,
     } = services;
     // server.js may pass either the handler itself or a getter function so the
     // active TTS engine can be hot-swapped via /api/config. Normalise both.
@@ -70,6 +70,10 @@ function createRouter(services) {
     const handlers = {
         Hello(evt) {
             configStore.applyHello(evt);
+            // Hello is the first point paths.eventsDirectory is known; the
+            // boot-time watch attempt (before any Hello) is a no-op on a
+            // fresh install, so retry it here now that the path exists.
+            if (startStageWatch) startStageWatch();
             const tsys = evt.timingSystem || {};
             const chans = evt.channelSettings?.channels || [];
             logger.info(`[Hello] v${evt.fpvtVersion} ${evt.platform} profile=${evt.profile?.name} timers=${tsys.count} sectorsPerLap=${tsys.splitsPerLap}`);
