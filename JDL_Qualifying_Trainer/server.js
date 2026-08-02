@@ -56,6 +56,11 @@ const DEFAULT_CONFIG = {
         targetLapTime: 0,
         // Read the Target delta aloud after each lap time (voice).
         speakTargetDelta: false,
+        // Append "残りy秒" to the lap call once the pilot's remaining window
+        // time drops below lapRemainingThreshold seconds. y is whole seconds,
+        // rounded. Off by default; the threshold is ignored while off.
+        speakLapRemaining: false,
+        lapRemainingThreshold: 30,
     },
     google_sheets: {
         // Export the Time Trial results (one row per pilot per valid race) to a
@@ -77,6 +82,15 @@ const DEFAULT_CONFIG = {
         // false = "anonymous" mode: the pilot's name is dropped from every
         // announcement except staggeredStart (voice-templates.js isPilotNameSuppressed).
         speakPilotName: true,
+        // NOTE: `decimalPlaces` (decimal places for spoken times — lap time,
+        // finish total, target delta) is deliberately NOT seeded here.
+        // config-store.js ttsDecimalPlaces() falls back to the decimalPlaces
+        // FPVTrackside reported in Hello whenever the key is absent, so an
+        // existing install keeps the digit count it had before this setting
+        // existed. Writing a default would pin every upgraded config to that
+        // number and silently change what operators hear. The control panel
+        // shows the effective value and writes an explicit 1..3 the first time
+        // anything is saved; out-of-range values are clamped on read.
     },
     // Per-category ON/OFF switches for voice announcements (voice-templates.js
     // isCategoryEnabled). false = that category is silenced regardless of what

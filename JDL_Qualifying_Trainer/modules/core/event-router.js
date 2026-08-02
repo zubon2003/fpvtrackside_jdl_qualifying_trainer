@@ -129,11 +129,26 @@ function createRouter(services) {
             let targetDelta = null;
             let windowFinish = false;
             let finishSummary = null;
+            let lapRemaining = null;
             if (liveQualify && evt.isLapEnd && evt.valid !== false) {
                 liveQualify.onDetection(evt);
                 // Only compute/speak the delta when the operator enabled it.
                 if (configStore.get().live_qualify?.speakTargetDelta !== false) {
                     targetDelta = liveQualify.pilotDelta(evt.pilotName);
+                }
+                // Optional "残りy秒" tail on the lap call, once the pilot is inside
+                // the closing stretch of their window. Opt-in (default off), and
+                // only when the time left at this crossing is under the operator's
+                // threshold — voice-logic.js does the rounding and the "don't say
+                // 残り0秒" guard.
+                const lq = configStore.get().live_qualify;
+                if (lq?.speakLapRemaining) {
+                    const threshold = Number(lq.lapRemainingThreshold);
+                    const left = liveQualify.pilotRemainingAtLap(evt.pilotName);
+                    if (Number.isFinite(threshold) && threshold > 0
+                        && left != null && left < threshold) {
+                        lapRemaining = left;
+                    }
                 }
                 // True on the one lap that pushes this pilot past the 90s window —
                 // the voice announcer speaks a "finish" cue and goes quiet after.
@@ -147,7 +162,9 @@ function createRouter(services) {
                 io.emit('play_sound', { file: 'detection.wav' });
             }
 
-            voiceLogic.onDetection(evt, announce, { targetDelta, windowFinish, finishSummary });
+            voiceLogic.onDetection(evt, announce, {
+                targetDelta, windowFinish, finishSummary, lapRemaining,
+            });
         },
 
         RaceResult(evt) {

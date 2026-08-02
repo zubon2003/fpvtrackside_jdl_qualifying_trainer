@@ -165,6 +165,32 @@
             </div>
 
             <div class="card">
+                <div class="card-header"><i class="fas fa-stopwatch fa-fw"></i>ラップ通過時の残り時間コール</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="lq_speak_remaining">
+                                <label class="form-check-label small" for="lq_speak_remaining">「残りy秒」を追加で読み上げる</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">読み上げ開始（残り秒）</label>
+                            <input type="number" step="1" min="1" max="90" id="lq_remaining_threshold" class="form-control" placeholder="30">
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        パイロットの90秒ウィンドウの残りがこの秒数を下回ると、以降のラップ通過コールの末尾に
+                        「残りy秒」を追加します（yは<strong>小数点以下第1位を四捨五入した整数</strong>）。<br>
+                        例:「〇〇選手、3周目28.42秒、残り25秒」。<br>
+                        <strong>「残り0秒」も発声します</strong>— 周回はスタート時点がウィンドウ内なら成立するため、
+                        残り0秒のコールは「この次の周回もまだ有効」を意味します。
+                        ウィンドウを過ぎたコールは90秒フィニッシュのコールに切り替わります。
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="fas fa-table fa-fw"></i>Google Sheets 書き出し（Time Trial 結果）</span>
                     <div class="form-check form-switch m-0">
@@ -213,6 +239,17 @@
                             <label class="form-label mb-1">Voice file <button type="button" id="voice_file_refresh" class="btn btn-link btn-sm p-0 ms-1" title="Rescan voice*.json files"><i class="fas fa-sync-alt"></i></button></label>
                             <select id="voice_file" class="form-select"></select>
                             <div class="small text-muted mt-1">Lists <code>voice*.json</code> files in the receiver folder. Selected file supplies the phrase templates used by both engines.</div>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2 align-items-end">
+                        <div class="col-12">
+                            <label class="form-label mb-1" for="tts_decimals">読み上げタイムの小数点以下</label>
+                            <select id="tts_decimals" class="form-select">
+                                <option value="1">1桁（例: 28.4秒）</option>
+                                <option value="2">2桁（例: 28.42秒）</option>
+                                <option value="3">3桁（例: 28.418秒）</option>
+                            </select>
+                            <div class="small text-muted mt-1">ラップタイム・フィニッシュ合計・ターゲット差分の読み上げに適用されます。リーダーボードとLive 90s表示の桁数は変わりません。</div>
                         </div>
                     </div>
                     <div class="small text-muted mt-2">Race announcements + Test Voice route through the selected engine.</div>
@@ -473,6 +510,13 @@ async function loadConfig() {
 
     document.getElementById('tts_speak_pilot').checked = tts.speakPilotName !== false;
 
+    // Mirrors config-store.js ttsDecimalPlaces(): unset falls back to the
+    // decimalPlaces FPVTrackside reported in Hello, then clamped to 1..3 so
+    // the select always lands on a real option.
+    const dpRaw = Number(tts.decimalPlaces ?? cfg.fpvt?.decimalPlaces ?? 2);
+    const dp = Number.isFinite(dpRaw) ? Math.min(3, Math.max(1, Math.round(dpRaw))) : 3;
+    document.getElementById('tts_decimals').value = String(dp);
+
     const engine = tts.engine === 'browser' ? 'browser' : 'voicevox';
     const engineEl = document.querySelector(`input[name="tts_engine"][value="${engine}"]`);
     if (engineEl) engineEl.checked = true;
@@ -507,6 +551,8 @@ async function loadConfig() {
     if (lqEl) lqEl.checked = true;
     document.getElementById('lq_target').value = lq.targetLapTime ?? 0;
     document.getElementById('lq_speak_delta').checked = lq.speakTargetDelta !== false;
+    document.getElementById('lq_speak_remaining').checked = !!lq.speakLapRemaining;
+    document.getElementById('lq_remaining_threshold').value = lq.lapRemainingThreshold ?? 30;
 
     const gs = cfg.google_sheets || {};
     document.getElementById('gs_enabled').checked = !!gs.enabled;
@@ -529,6 +575,9 @@ async function saveConfig() {
     const lqTarget = parseFloat(document.getElementById('lq_target').value);
     cfg.live_qualify.targetLapTime = (Number.isFinite(lqTarget) && lqTarget > 0) ? lqTarget : 0;
     cfg.live_qualify.speakTargetDelta = document.getElementById('lq_speak_delta').checked;
+    cfg.live_qualify.speakLapRemaining = document.getElementById('lq_speak_remaining').checked;
+    const lqRem = parseInt(document.getElementById('lq_remaining_threshold').value, 10);
+    cfg.live_qualify.lapRemainingThreshold = (Number.isFinite(lqRem) && lqRem > 0) ? Math.min(90, lqRem) : 30;
 
     cfg.google_sheets = cfg.google_sheets || {};
     cfg.google_sheets.enabled = document.getElementById('gs_enabled').checked;
@@ -565,6 +614,8 @@ async function saveConfig() {
     cfg.tts.engine = engineEl ? engineEl.value : 'voicevox';
     cfg.tts.voiceFile = document.getElementById('voice_file').value || 'voice.json';
     cfg.tts.speakPilotName = document.getElementById('tts_speak_pilot').checked;
+    const ttsDp = parseInt(document.getElementById('tts_decimals').value, 10);
+    cfg.tts.decimalPlaces = Number.isFinite(ttsDp) ? Math.min(3, Math.max(1, ttsDp)) : 2;
     applyEngineVisibility(cfg.tts.engine);
 
     cfg.voice_enabled = cfg.voice_enabled || {};

@@ -7,6 +7,7 @@
   "countdown30": "{pilot}、{remaining} seconds left",
   "countdown20": "{pilot}、{remaining} seconds left",
   "countdown10": "{pilot}、{remaining} seconds left",
+  "lapRemaining": "{remaining} seconds left",
   "staggeredStart": "{pilot}、start.",
   "crash": "{pilot} crashed",
   "raceEnd": "race finished",

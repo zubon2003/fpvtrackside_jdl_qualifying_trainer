@@ -74,6 +74,20 @@ function decimalPlaces() {
     return current.fpvt?.decimalPlaces ?? 2;
 }
 
+// Decimal places for times *spoken* by TTS (lap time, finish total, target
+// delta). Operator-settable in the control panel, 1..3 — a wider range than
+// the displays use, because reading "28.4秒" is quicker on the ear than
+// "28.418秒" during a live call. Unset falls back to whatever FPVTrackside
+// reported in Hello (§ decimalPlaces above); the result is always clamped
+// into 1..3 so a stray config value can never produce "28秒" or "28.4183秒".
+const TTS_DP_MIN = 1;
+const TTS_DP_MAX = 3;
+function ttsDecimalPlaces() {
+    const raw = Number(current.tts?.decimalPlaces ?? decimalPlaces());
+    if (!Number.isFinite(raw)) return TTS_DP_MAX;
+    return Math.min(TTS_DP_MAX, Math.max(TTS_DP_MIN, Math.round(raw)));
+}
+
 function workingDirectory() {
     return current.fpvt?.paths?.workingDirectory || null;
 }
@@ -95,6 +109,9 @@ module.exports = {
     replace,
     applyHello,
     decimalPlaces,
+    ttsDecimalPlaces,
+    TTS_DP_MIN,
+    TTS_DP_MAX,
     workingDirectory,
     resolveMedia,
 };

@@ -13,8 +13,8 @@ const FILE_PATTERN = /^voice([_-][A-Za-z0-9._-]+)?\.json$/i;
 // voice file. Edit voice.json (or a voice_XX.json variant) to override.
 // Placeholders: {pilot}, {lap}, {time}, {total}
 const DEFAULTS = {
-    lap:            '{pilot}、ラップ{lap}、{time}秒',
-    lapNoTime:      '{pilot}、ラップ{lap}',
+    lap:            '{pilot}選手、{lap}周目{time}秒',
+    lapNoTime:      '{pilot}選手、{lap}周目',
     // `windowFinish` fires once per pilot when their 90s-qualifying window
     // closes (the lap that pushes elapsed time since holeshot past 90s).
     // Replaces the normal lap call; no further laps are announced after it.
@@ -23,19 +23,19 @@ const DEFAULTS = {
     // voice-logic.js splitMinSec). windowFinishSecOnly is used when the total
     // is under a minute (skips the "0分" phrasing); windowFinishNoTime is
     // used on the rare chance the summary isn't available yet.
-    windowFinish:       '{pilot}、フィニッシュ!{laps}周、トータル{min}分{sec}秒',
-    windowFinishSecOnly: '{pilot}、フィニッシュ!{laps}周、トータル{sec}秒',
-    windowFinishNoTime: '{pilot}、フィニッシュ',
+    windowFinish:       '{pilot}選手、フィニッシュ!{laps}周、トータル{min}分{sec}秒',
+    windowFinishSecOnly: '{pilot}選手、フィニッシュ!{laps}周、トータル{sec}秒',
+    windowFinishNoTime: '{pilot}選手、フィニッシュ',
     // Countdown cues fired from the elapsed time since each pilot's own
     // holeshot (60s/70s/80s in), independent of lap crossings. {remaining} is
     // the seconds-left number (30/20/10).
-    countdown30:    '{pilot}、残り{remaining}秒',
-    countdown20:    '{pilot}、残り{remaining}秒',
-    countdown10:    '{pilot}、残り{remaining}秒',
+    countdown30:    '{pilot}選手、残り{remaining}秒',
+    countdown20:    '{pilot}選手、残り{remaining}秒',
+    countdown10:    '{pilot}選手、残り{remaining}秒',
     // `staggeredStart` is the per-pilot go signal in a TimeTrial staggered start
     // — emitted on the wire as PilotStaggeredStart (spec §7.9), independent of
     // any detection (the holeshot crossing itself is not announced).
-    staggeredStart: '{pilot}、スタート',
+    staggeredStart: '{pilot}選手、スタート',
     // `raceStart` fires once on the RaceStart event (whole-race, no pilot).
     raceStart:      'レースを開始します。',
     // Pacemaker (Target) delta, appended after the lap time when a target lap
@@ -43,7 +43,14 @@ const DEFAULTS = {
     targetAhead:    'ターゲットより{delta}秒速い',
     targetBehind:   'ターゲットより{delta}秒遅い',
     targetEven:     'ターゲットどおり',
-    crash:          '{pilot}、クラッシュアウト',
+    // Appended to the lap call (after the target delta) once the pilot's
+    // remaining window time drops below live_qualify.lapRemainingThreshold.
+    // {remaining} is whole seconds, rounded from the time left at that
+    // crossing. Unlike countdown30/20/10 this rides along with a lap call
+    // instead of firing on its own clock, and has its own ON/OFF switch at
+    // live_qualify.speakLapRemaining — so it is not listed in CATEGORY_OF_KEY.
+    lapRemaining:   '残り{remaining}秒',
+    crash:          '{pilot}選手、クラッシュアウト',
     raceEnd:        'レース終了',
     raceCancelled:  'レース中止',
     raceFailed:     'レース失敗',
@@ -166,9 +173,10 @@ function render(key, vars = {}) {
     if (!isCategoryEnabled(key)) return '';
     let text = tpl;
     if (isPilotNameSuppressed(key)) {
-        // Drop {pilot} together with a trailing separator (、, or plain space)
-        // so silencing the name doesn't leave a stray leading pause.
-        text = text.replace(/\{pilot\}[、,]?\s*/g, '');
+        // Drop {pilot} together with any honorific (選手/さん) and a trailing
+        // separator (、, or plain space), so silencing the name doesn't leave
+        // a stray "選手、" or a leading pause behind.
+        text = text.replace(/\{pilot\}(?:選手|さん)?[、,]?\s*/g, '');
     }
     return text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m));
 }

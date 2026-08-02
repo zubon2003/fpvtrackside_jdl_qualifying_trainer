@@ -28,7 +28,7 @@ function _resetPhoneticWarnings() {
 
 function fmtSec(value) {
     if (value == null || !Number.isFinite(value)) return null;
-    const dp = configStore.decimalPlaces();
+    const dp = configStore.ttsDecimalPlaces();
     return Number(value).toFixed(dp);
 }
 
@@ -37,7 +37,7 @@ function fmtSec(value) {
 // `min` is always >= 1 — no need for a "0 minutes" fallback in the templates.
 function splitMinSec(value) {
     if (value == null || !Number.isFinite(value)) return null;
-    const dp = configStore.decimalPlaces();
+    const dp = configStore.ttsDecimalPlaces();
     const mins = Math.floor(value / 60);
     const secs = value - mins * 60;
     return { min: mins, sec: secs.toFixed(dp) };
@@ -96,6 +96,25 @@ function renderTargetDelta(d) {
     return voiceTemplates.render(key, { delta: abs }) || '';
 }
 
+// Render the "残りy秒" tail appended to a lap call when the pilot is inside the
+// closing stretch of their window. `remaining` is the seconds left at that
+// crossing (§ live-qualify.js pilotRemainingAtLap); the operator's threshold
+// has already been applied by the caller. Rounded to a whole second — a lap
+// call is no place for decimals.
+//
+// "残り0秒" is a real, wanted message, not a degenerate one: a lap counts if the
+// crossing that STARTS it fell inside the window, so any call with remaining
+// still >= 0 tells the pilot the lap they are now beginning will be counted.
+// Only a genuinely negative remaining is suppressed — normally unreachable
+// (the windowFinish cue takes that crossing instead), but it can happen if the
+// receiver joined mid-race and missed the crossing that closed the window.
+function renderLapRemaining(remaining) {
+    if (remaining == null || !Number.isFinite(remaining)) return '';
+    if (remaining < 0) return '';
+    const y = Math.round(remaining);
+    return voiceTemplates.render('lapRemaining', { remaining: y }) || '';
+}
+
 // Build a TTS line for one DetectionExt and dispatch it to the announcer.
 function onDetection(evt, announce, opts = {}) {
     if (!raceActive) return;
@@ -135,6 +154,10 @@ function onDetection(evt, announce, opts = {}) {
         // When a Target is active, read the gap after the lap time.
         const dText = renderTargetDelta(opts.targetDelta);
         if (ttsText && dText) ttsText = `${ttsText}、${dText}`;
+        // Then, inside the closing stretch, how long they have left. Last so
+        // the most time-critical number is the one the pilot hears last.
+        const rText = renderLapRemaining(opts.lapRemaining);
+        if (ttsText && rText) ttsText = `${ttsText}、${rText}`;
     }
 
     if (!ttsText) return;

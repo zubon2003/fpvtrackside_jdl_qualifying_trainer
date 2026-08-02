@@ -248,6 +248,21 @@ function pilotsRemaining() {
     return out;
 }
 
+// Seconds left in the pilot's 90s window *at the moment of their most recent
+// recorded crossing* — not the wall clock. Used by the voice announcer to
+// append a "残りy秒" cue to the lap call, so the number spoken matches the lap
+// that was just called rather than drifting with TTS latency. Like
+// isWindowClosingLap(), call this right after feeding the detection to
+// onDetection(). Returns null when the pilot has no window origin yet or has
+// only the origin crossing; can be negative once the window has closed.
+function pilotRemainingAtLap(pilotName) {
+    const p = state.pilots.get(pilotName);
+    if (!p) return null;
+    const B = boundaries(p.lapEnds, isHoleshotMode());
+    if (B.length < 2) return null;   // origin only — no real lap crossing yet
+    return WINDOW - (B[B.length - 1] - B[0]);
+}
+
 // { laps, time } of the pilot's counted laps at the current state -- laps is
 // the number of gate crossings that started within the window (matches the
 // leaderboard scoring, not necessarily FPVTrackside's raw lapNumber if any
@@ -303,5 +318,6 @@ module.exports = {
     isWindowClosingLap,
     pilotFinishSummary,
     pilotsRemaining,
+    pilotRemainingAtLap,
     WINDOW,
 };
